@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://soulspark-cn.github.io/eu261-claim-assistant/sitemap.xml

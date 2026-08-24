@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EU261 Claim Assistant — Is your flight compensable?</title>
+<style>
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0f1115;color:#e7e9ee;margin:0;padding:0;line-height:1.55}
+  .wrap{max-width:760px;margin:0 auto;padding:28px 20px 60px}
+  h1{font-size:26px;margin:0 0 4px}
+  .sub{color:#9aa3b2;margin:0 0 24px}
+  .card{background:#171b23;border:1px solid #262c38;border-radius:14px;padding:22px;margin-bottom:18px}
+  label{display:block;font-size:13px;color:#9aa3b2;margin:12px 0 4px}
+  input,select{width:100%;background:#0f1115;border:1px solid #2a3240;border-radius:8px;padding:11px 12px;color:#e7e9ee;font-size:15px;box-sizing:border-box}
+  .row{display:flex;gap:12px}.row>div{flex:1}
+  button{width:100%;margin-top:16px;padding:14px;border:0;border-radius:10px;background:#3b82f6;color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+  button:hover{background:#2f6fd8}
+  .verdict{font-size:18px;font-weight:700;margin:0 0 8px}
+  .ok{color:#4ade80}.no{color:#f87171}.warn{color:#fbbf24}
+  pre{white-space:pre-wrap;background:#10131a;border:1px solid #262c38;border-radius:10px;padding:16px;font-size:13px;color:#cbd5e1}
+  .pay{background:linear-gradient(135deg,#1d4ed8,#7c3aed);border-radius:12px;padding:18px;margin-top:16px;text-align:center}
+  .pay a{color:#fff;background:rgba(255,255,255,.14);padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:600;display:inline-block}
+  .fine{color:#7d8592;font-size:12px;margin-top:10px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>✈️ EU261 Claim Assistant</h1>
+  <p class="sub">Delayed or cancelled in Europe? You may be owed <b>€250–€600</b>. Check eligibility in seconds — then copy a ready-to-send claim letter.</p>
+
+  <div class="card">
+    <div class="row">
+      <div><label>Airline</label><input id="airline" placeholder="e.g. Lufthansa, United, KLM"></div>
+      <div><label>Flight number</label><input id="flight" placeholder="e.g. LH401"></div>
+      <div><label>Date</label><input id="date" type="date"></div>
+    </div>
+    <div class="row">
+      <div><label>Departure city</label><input id="origin" placeholder="e.g. New York"></div>
+      <div><label>Arrival city</label><input id="dest" placeholder="e.g. Frankfurt"></div>
+    </div>
+    <div class="row">
+      <div><label>Delay on arrival (hours)</label><input id="delay" type="number" step="0.1" min="0" value="0"></div>
+      <div><label>Reason</label>
+        <select id="cause">
+          <option value="technical">Technical / crew (airline's fault)</option>
+          <option value="weather">Bad weather</option>
+          <option value="strike">Strike / ATC</option>
+          <option value="overbook">Overbooked / denied boarding</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>Cancelled?</label>
+        <select id="cancelled"><option value="no">No</option><option value="yes">Yes — cancelled</option></select>
+      </div>
+      <div><label>If cancelled, days' notice before departure</label><input id="cancelDays" type="number" min="1" value="0"></div>
+    </div>
+    <button onclick="analyze()">Check eligibility</button>
+  </div>
+
+  <div id="result" class="hidden"></div>
+
+  <div class="fine">Information & reference only — not legal advice. Actual compensation depends on airline and regulator decisions.</div>
+</div>
+
+<script>
+const EU_AIRPORTS=["uk","britain","england","london","heathrow","gatwick","manchester","edinburgh","birmingham","germany","frankfurt","munich","berlin","hamburg","france","paris","cdg","charles de gaulle","nice","netherlands","amsterdam","schiphol","belgium","brussels","spain","madrid","barcelona","italy","rome","milan","venice","portugal","lisbon","greece","athens","austria","vienna","switzerland","zurich","geneva","ireland","dublin","finland","helsinki","sweden","stockholm","denmark","copenhagen","norway","oslo","poland","warsaw","czech","prague","hungary","budapest","luxembourg","iceland","reykjavik"];
+const EU_AIRLINES=["lufthansa","air france","klm","british airways","swiss","finnair","norwegian","ryanair","easyjet","wizz","tap","austrian","iberia","alitalia","ita","sas","icelandair","lot","brussels airlines","lufthansa group"];
+const TIME_LIMIT={"UK":"6 years","Germany":"3 years","France":"5 years","Netherlands":"2 years","Ireland":"6 years","Sweden":"10 years","Finland":"10 years","Italy":"5 years","Spain":"5 years","Belgium":"2 years","Austria":"3 years","Portugal":"3 years","Denmark":"3 years","Switzerland":"10 years"};
+// rough distances (km) for amount tier
+const DIST={"New York-Frankfurt":6200,"New York-London":5570,"New York-Paris":5834,"New York-Amsterdam":5850,"Los Angeles-London":8760,"Los Angeles-Paris":9100,"Los Angeles-Frankfurt":9120,"San Francisco-Frankfurt":9120,"New York-Madrid":5760,"New York-Rome":6890,"Chicago-Frankfurt":7000,"Boston-London":5260};
+function isEUAirport(s){s=s.toLowerCase();return EU_AIRPORTS.some(x=>s.includes(x));}
+function isEUAirline(s){s=s.toLowerCase();return EU_AIRLINES.some(x=>s.includes(x));}
+function cityKey(o,d){return o.trim()+"-"+d.trim();}
+function amount(o,d){const k=cityKey(o,d);const km=DIST[k];
+  if(km){ return km<=1500?250:(km<=3500?400:600); }
+  return 600; // long-haul default
+}
+function jurisdiction(o,d){
+  const s=(o+" "+d).toLowerCase();
+  for(const pair of [["london","UK"],["heathrow","UK"],["manchester","UK"],["dublin","Ireland"],["frankfurt","Germany"],["munich","Germany"],["berlin","Germany"],["paris","France"],["nice","France"],["amsterdam","Netherlands"],["brussels","Belgium"],["madrid","Spain"],["barcelona","Spain"],["rome","Italy"],["milan","Italy"],["vienna","Austria"],["zurich","Switzerland"],["geneva","Switzerland"],["lisbon","Portugal"],["copenhagen","Denmark"],["stockholm","Sweden"],["helsinki","Finland"],["athens","Greece"]]){ if(s.includes(pair[0].toLowerCase())) return pair[1]; }
+  return "the destination jurisdiction";
+}
+function analyze(){
+  const airline=document.getElementById("airline").value.trim();
+  const origin=document.getElementById("origin").value.trim();
+  const dest=document.getElementById("dest").value.trim();
+  const flight=document.getElementById("flight").value.trim()||"your flight";
+  const date=document.getElementById("date").value||"DATE";
+  const delay=parseFloat(document.getElementById("delay").value)||0;
+  const cause=document.getElementById("cause").value;
+  const cancelled=document.getElementById("cancelled").value==="yes";
+  const cancelDays=parseInt(document.getElementById("cancelDays").value,10)||0;
+  const out=document.getElementById("result");
+  const orgEU=isEUAirport(origin), dstEU=isEUAirport(dest), euAir=isEUAirline(airline);
+  let covered, msg, cls;
+  if(orgEU){covered=true;msg="Departing from an EU airport → covered.";}
+  else if(dstEU&&euAir){covered=true;msg="EU airline arriving in the EU → covered.";}
+  else{covered=false;msg="Not covered by EU261 (non-EU departure + non-EU airline).";}
+  const triggers=[];
+  if(delay>=3)triggers.push("arrival delay ≥3h");
+  if(cancelled&&cancelDays>=1&&cancelDays<=14)triggers.push("cancelled ≤14 days before");
+  if(cause==="overbook")triggers.push("denied boarding (overbooking)");
+  const exCause=["weather","strike"].includes(cause);
+  const amt=covered&&triggers.length?amount(origin,dest):null;
+  const jur=covered?jurisdiction(origin,dest):"N/A";
+  const tl=covered?TIME_LIMIT[jur]||"varies by country":"N/A";
+  let vcls,verdict;
+  if(!covered){vcls="no";verdict="Not covered by EU261";}
+  else if(!triggers.length){vcls="warn";verdict="Covered, but no trigger met";}
+  else if(exCause){vcls="warn";verdict="Likely compensable, but reason may be disputed";}
+  else{vcls="ok";verdict="Compensable — likely €"+(amt||0)+" / person";}
+  const letter=buildLetter({airline,origin,dest,flight,date,delay,triggers,covered,amt,jur,tl,exCause,msg,cause});
+  out.classList.remove("hidden");
+  out.innerHTML=
+    '<div class="card"><p class="verdict '+vcls+'">'+verdict+'</p>'+
+    '<p style="color:#9aa3b2;margin:0 0 8px">'+msg+' · Amount: '+(amt?('€'+amt+' / person'):'—')+' · Time limit: '+tl+'</p>'+
+    '<p style="font-size:13px;color:#9aa3b2">Reason: '+cause+' ｜ '+((triggers.length?triggers.join(" · "):"no trigger met"))+'</p>'+
+    '<div class="pay"><a href="'+PAYLINK+'">Unlock full claim letter — $19</a>'+
+    '<div class="fine" style="margin-top:10px">Save time vs AirHelp's ~25% cut (AirHelp takes €150 on a €600 claim).</div></div>'+
+    '</div>'+
+    '<div class="card"><h3 style="margin:0 0 8px">Preview of your claim letter</h3><pre>'+letter+'</pre></div>';
+}
+function buildLetter(f){
+  let amountLine = f.covered&&f.amt?("EUR "+f.amt+" per passenger"):"the applicable amount";
+  let statusLine = !f.covered?("This flight is NOT covered by EU261."):(f.triggers.length?("I was affected by: "+f.triggers.join(", ")+"."):"No compensation trigger was met.");
+  if(f.exCause) statusLine+=" Note: the cause may fall under extraordinary circumstances.";
+  return "Subject: Claim for Compensation under Regulation (EC) No 261/2004 — Flight "+f.flight+" ("+f.date+")\n\n"+
+   "Dear Airline Customer Service,\n\n"+
+   "I am writing to claim compensation under Regulation (EC) No 261/2004 for the disruption to my flight "+f.flight+" on "+f.date+", operated by "+f.airline+", from "+f.origin+" to "+f.dest+".\n\n"+
+   "Details: flight "+f.flight+", "+f.date+", "+f.origin+" → "+f.dest+".\n"+
+   statusLine+"\n\n"+
+   "I request compensation of "+amountLine+" per passenger. Please respond in writing within the statutory period. I have attached my boarding pass, arrival confirmation, and notification of the disruption.\n\n"+
+   "If this is not accepted, I will escalate to the relevant National Enforcement Body and, if necessary, small claims court.\n\n"+
+   "Yours faithfully,\n[Full name]\n[Booking reference]\n[Passenger names on booking]\n[Contact email / phone]\n\n(Generated by EU261 Claim Assistant — verify before sending. Not legal advice.)";
+}
+const PAYLINK="PLACEHOLDER_CREEM_LINK";
+</script>
+</body>
+</html>

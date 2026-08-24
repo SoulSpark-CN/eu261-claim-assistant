@@ -120,7 +120,12 @@ function analyze(){
     '<div class="pay"><a href="'+PAYLINK+'">Unlock full claim letter — $19</a>'+
     '<div class="fine" style="margin-top:10px">Save time vs AirHelp's ~25% cut (AirHelp takes €150 on a €600 claim).</div></div>'+
     '</div>'+
-    '<div class="card"><h3 style="margin:0 0 8px">Preview of your claim letter</h3><pre>'+letter+'</pre></div>';
+    '<div class="card"><h3 style="margin:0 0 8px">Your ready-to-send claim letter</h3>'+
+    '<p style="color:#9aa3b2;font-size:14px">Here is the first part of your personalised claim letter. Unlock the full letter + step-by-step guide for a one-time $19.</p>'+
+    '<pre style="max-height:150px;overflow:hidden;position:relative">'+letter.split("\n").slice(0,6).join("\n")+'\n<div style="position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(transparent,#10131a)"></div></pre>'+
+    '<div class="pay"><a href="'+PAYLINK+'">Unlock full claim letter + guide — $19</a>'+
+    '<div class="fine" style="margin-top:10px">Instant PDF + personalised letter. Cheaper than AirHelp's ~25% cut.</div></div>'+
+    '</div>';
 }
 function buildLetter(f){
   let amountLine = f.covered&&f.amt?("EUR "+f.amt+" per passenger"):"the applicable amount";
